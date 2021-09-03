@@ -4,6 +4,7 @@
 #include "GLFW/glfw3.h"
 #include "Shader.h"
 #include "camera.h"
+#include "stb_image.h"
 
 #include "glm/glm.hpp"
 #include "glm/gtc/matrix_transform.hpp"
@@ -20,6 +21,7 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 void createCubeSphere(int subdivision);
 void createCubeSphereFace(int face, int subdivision, std::vector<float>* vertices);
 void calculateNormalsCubesphere(int face, float angle, int axis, glm::tvec3<float> *normal);
+void addTextureCoords();
 
 // settings
 const unsigned int SCR_WIDTH = 800;
@@ -35,11 +37,13 @@ bool firstMouse = true;
 float deltaTime = 0.0f;	// time between current frame and last frame
 float lastFrame = 0.0f;
 
+//*******************PARAMETERS*******************
 int subdivision = 6;
+int numFaces = 6;
 int rowPerFace = glm::pow(2, subdivision) + 1;
 
 
-float cubesphereVertices[76050];
+float cubesphereVertices[76050 + 50700];
 unsigned int cubesphereIndices[152100];
 
 int main()
@@ -81,36 +85,40 @@ int main()
         return -1;
     }
 
+    // ---------- Texture -----------------------
+    // ------------------------------------------
+    unsigned int textureEarth;
+    glGenTextures(1, &textureEarth);
+    glBindTexture(GL_TEXTURE_2D, textureEarth);
+    // set the texture wrapping/filtering options (on the currently bound texture object)
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    // load and generate the texture
+    int width, height, nrChannels;
+    stbi_set_flip_vertically_on_load(true);
+    unsigned char* data = stbi_load("earth.jpg", &width, &height, &nrChannels, 0);
+    if (data)
+    {
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+        glGenerateMipmap(GL_TEXTURE_2D);
+    }
+    else
+    {
+        std::cout << "Failed to load texture" << std::endl;
+    }
+    stbi_image_free(data);
+    // ------------------------------------------
 
     // build and compile our shader program
-    Shader shader = Shader("shader.vs", "shader.fs");
+    Shader shader = Shader("shader.vs", "shader.fs", "shader.gs");
 
     // set up vertex data (and buffer(s)) and configure vertex attributes
     // ------------------------------------------------------------------
-    //std::vector<float> cubesphereVerticesVector = createCubeSphere(subdivision);
-    /*float cubesphereVertices[12675];
-    for (unsigned int i = 0; i < cubesphereVerticesVector.size(); i++) {
-        cubesphereVertices[i] = cubesphereVerticesVector[i];
-    }*/
-    //unsigned int cubesphereIndices[24576];
     createCubeSphere(subdivision);
-    /*
-    unsigned int j = 0;
-    for (unsigned int i = 0; i + rowPerFace + 1 <= cubesphereVerticesVector.size()/3; i++) {
-        if ((i + 1) % rowPerFace == 0) continue;
-        cubesphereIndices[j] = i;
-        cubesphereIndices[j + 1] = i + 1;
-        cubesphereIndices[j + 2] = i + rowPerFace;
-        cubesphereIndices[j + 3] = i + 1;
-        cubesphereIndices[j + 4] = i + rowPerFace;
-        cubesphereIndices[j + 5] = i + rowPerFace + 1;
-        j += 6;
-    }*/
-    /*j = 0;
-    for (unsigned int j = 0; j < sizeof(cubesphereIndices)/4; ) {
-        std::cout << cubesphereIndices[j] << ", " << cubesphereIndices[j+1] << ", " << cubesphereIndices[j+2] << ", " << std::endl;
-        j += 3;
-    } */   
+    // ------------------------------------------------------------------
+
 
     unsigned int VBO, VAO, EBO;
     glGenVertexArrays(1, &VAO);
@@ -127,8 +135,8 @@ int main()
 
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
-    //glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
-    //glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)(rowPerFace * rowPerFace * numFaces * 3 * sizeof(float)));
+    glEnableVertexAttribArray(1);
 
     // note that this is allowed, the call to glVertexAttribPointer registered VBO as the vertex attribute's bound vertex buffer object so afterwards we can safely unbind
     glBindBuffer(GL_ARRAY_BUFFER, 0);
@@ -138,7 +146,7 @@ int main()
     glBindVertexArray(0);
 
     // uncomment this call to draw in wireframe polygons.
-    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+    //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
     // enable Depth test
     glEnable(GL_DEPTH_TEST);
@@ -152,6 +160,8 @@ int main()
     glm::mat4 projection;
     projection = glm::perspective(glm::radians(45.0f), 800.0f / 600.0f, 0.1f, 100.0f);
 
+    shader.use();
+    shader.setInt("earth", 0);
     // render loop
     // -----------
     while (!glfwWindowShouldClose(window))
@@ -175,7 +185,7 @@ int main()
         glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
         shader.setMat4("projection", projection);
 
-
+        glBindTexture(GL_TEXTURE_2D, textureEarth);
         glBindVertexArray(VAO); 
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
         glDrawElements(GL_TRIANGLES, sizeof(cubesphereIndices)/4, GL_UNSIGNED_INT, 0);
@@ -254,7 +264,7 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 void createCubeSphere(int subdivision) {
 
     std::vector<float> cubesphereVerticesVector;
-    for (int i = 0; i < 6; i++) {
+    for (int i = 0; i < numFaces; i++) {
         createCubeSphereFace(i, subdivision, &cubesphereVerticesVector);
     }
     for (unsigned int i = 0; i < cubesphereVerticesVector.size(); i++) {
@@ -275,7 +285,7 @@ void createCubeSphere(int subdivision) {
         cubesphereIndices[j + 5] = i + rowPerFace + 1;
         j += 6;
     }
-    
+    addTextureCoords();   
    
 }
 
@@ -336,7 +346,7 @@ void calculateNormalsCubesphere(int face, float angle, int axis, glm::tvec3<floa
             (*normal)[2] = 0;
         }
         break;
-    case 1: //KA LEVO
+    case 2: //KA LEVO
         if (axis == 1) {
             (*normal)[0] = sin(angle);
             (*normal)[1] = 0;
@@ -348,7 +358,7 @@ void calculateNormalsCubesphere(int face, float angle, int axis, glm::tvec3<floa
             (*normal)[2] = 0;
         }
         break;
-    case 2: //KA GORE
+    case 5: //KA GORE
         if (axis == 1) {
             (*normal)[0] = cos(angle);
             (*normal)[1] = -sin(angle);
@@ -360,7 +370,7 @@ void calculateNormalsCubesphere(int face, float angle, int axis, glm::tvec3<floa
             (*normal)[2] = -cos(angle);
         }
         break;
-    case 3: //KA DOLE
+    case 4: //KA DOLE
         if (axis == 1) {
             (*normal)[0] = -cos(angle);
             (*normal)[1] = sin(angle);
@@ -372,7 +382,7 @@ void calculateNormalsCubesphere(int face, float angle, int axis, glm::tvec3<floa
             (*normal)[2] = -cos(angle);
         }
         break;
-    case 4: //NAPRED
+    case 3: //NAPRED
         if (axis == 1) {
             (*normal)[0] = cos(angle);
             (*normal)[1] = 0;
@@ -384,7 +394,7 @@ void calculateNormalsCubesphere(int face, float angle, int axis, glm::tvec3<floa
             (*normal)[2] = -sin(angle);
         }
         break;
-    case 5: //POZADI
+    case 1: //POZADI
         if (axis == 1) {
             (*normal)[0] = -cos(angle);
             (*normal)[1] = 0;
@@ -396,5 +406,30 @@ void calculateNormalsCubesphere(int face, float angle, int axis, glm::tvec3<floa
             (*normal)[2] = sin(angle);
         }
         break;
+    }
+}
+
+void addTextureCoords() {
+    int totalVerCoords = rowPerFace * rowPerFace * numFaces * 3;
+    for (int i = 0; i < rowPerFace * rowPerFace * numFaces * 3;) {
+        float cx = 0, cy = 0, cz = 0, r = 1;
+
+        float theta, phi;
+
+        theta = atan2(-(cubesphereVertices[i + 2] - cz), cubesphereVertices[i] - cx);
+        phi = acos(-(cubesphereVertices[i + 1] - cy) / r);
+
+        float u = (theta + glm::pi<float>()) / (2 * glm::pi<float>());
+        float v = phi / glm::pi<float>();
+
+        if (u == 1) {
+            u = 0;
+        }
+        if (u == 0) {
+            //std::cout << i/3 << " " << i+1 << " " << i+2 << std::endl;
+        }
+        cubesphereVertices[totalVerCoords++] = u;
+        cubesphereVertices[totalVerCoords++] = v;
+        i += 3;
     }
 }

@@ -1,8 +1,12 @@
 #version 450 core
 
+in vec2 TextCoords;
+
 out vec4 fragmentColor;
+
+uniform sampler2D earth;
 
 void main()
 {
-	fragmentColor = vec4(0.0f, 1.0, 0.0f, 1.0f);
+	fragmentColor = texture(earth, TextCoords);
 }
