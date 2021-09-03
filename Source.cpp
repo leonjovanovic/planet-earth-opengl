@@ -18,7 +18,8 @@ void processInput(GLFWwindow* window);
 void mouse_callback(GLFWwindow* window, double xpos, double ypos);
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 void createCubeSphere(int subdivision);
-std::vector<float> createCubeSphereFace(int face, int subdivision);
+void createCubeSphereFace(int face, int subdivision, std::vector<float>* vertices);
+void calculateNormalsCubesphere(int face, float angle, int axis, glm::tvec3<float> *normal);
 
 // settings
 const unsigned int SCR_WIDTH = 800;
@@ -38,8 +39,8 @@ int subdivision = 6;
 int rowPerFace = glm::pow(2, subdivision) + 1;
 
 
-float cubesphereVertices[12675];
-unsigned int cubesphereIndices[24576];
+float cubesphereVertices[76050];
+unsigned int cubesphereIndices[152100];
 
 int main()
 {
@@ -252,12 +253,19 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 
 void createCubeSphere(int subdivision) {
 
-    std::vector<float> cubesphereVerticesVector = createCubeSphereFace(0, subdivision);
+    std::vector<float> cubesphereVerticesVector;
+    for (int i = 0; i < 6; i++) {
+        createCubeSphereFace(i, subdivision, &cubesphereVerticesVector);
+    }
     for (unsigned int i = 0; i < cubesphereVerticesVector.size(); i++) {
         cubesphereVertices[i] = cubesphereVerticesVector[i];
     }
     unsigned int j = 0;
     for (unsigned int i = 0; i + rowPerFace + 1 <= cubesphereVerticesVector.size() / 3; i++) {
+        if ((i + rowPerFace) % (rowPerFace * rowPerFace) == 0) {
+            i += rowPerFace - 1; //-1 because after continue i++ -------------------------------------------------------------------------------------------------------------------
+            continue;
+        }
         if ((i + 1) % rowPerFace == 0) continue;
         cubesphereIndices[j] = i;
         cubesphereIndices[j + 1] = i + 1;
@@ -271,11 +279,11 @@ void createCubeSphere(int subdivision) {
    
 }
 
-std::vector<float> createCubeSphereFace(int face, int subdivision) {
+void createCubeSphereFace(int face, int subdivision, std::vector<float>* vertices) {
 
-    std::vector<float> vertices;
-    glm::tvec3<float> n1;        // normal of longitudinal plane rotating along Y-axis
-    glm::tvec3<float> n2;        // normal of latitudinal plane rotating along Z-axis
+    //std::vector<float> vertices;
+    glm::tvec3<float> n1(0, 0, 0);        // normal of longitudinal plane rotating along Y-axis
+    glm::tvec3<float> n2(0, 0, 0);        // normal of latitudinal plane rotating along Z-axis
     glm::tvec3<float> v;         // direction vector intersecting 2 planes, n1 x n2
     float a1;           // longitudinal angle along Y-axis
     float a2;           // latitudinal angle along Z-axis
@@ -290,9 +298,8 @@ std::vector<float> createCubeSphereFace(int face, int subdivision) {
         // if latitude angle is 0, then normal vector of latitude plane is n2=(0,1,0)
         // therefore, it is rotating (0,1,0) vector by latitude angle a2
         a2 = glm::radians((45.0f - 90.0f * i / (pointsPerRow - 1)));
-        n2[0] = -sin(a2);
-        n2[1] = cos(a2);
-        n2[2] = 0;
+        //std::cout << a2 << std::endl;
+        calculateNormalsCubesphere(face, a2, 2, &n2);
 
         // rotate longitudinal plane from -45 to 45 along Y-axis (left-to-right)
         for (unsigned int j = 0; j < pointsPerRow; ++j)
@@ -301,18 +308,93 @@ std::vector<float> createCubeSphereFace(int face, int subdivision) {
             // if longitude angle is 0, then normal vector of longitude is n1=(0,0,-1)
             // therefore, it is rotating (0,0,-1) vector by longitude angle a1
             a1 = glm::radians((-45.0f + 90.0f * j / (pointsPerRow - 1)));
-            n1[0] = -sin(a1);
-            n1[1] = 0;
-            n1[2] = -cos(a1);
+            calculateNormalsCubesphere(face, a1, 1, &n1);
 
             // find direction vector of intersected line, n1 x n2
             // normalize direction vector
             v = normalize(glm::cross(n1, n2));
             // add a vertex into array
-            vertices.push_back(v[0]);
-            vertices.push_back(v[1]);
-            vertices.push_back(v[2]);
+            (*vertices).push_back(v[0]);
+            (*vertices).push_back(v[1]);
+            (*vertices).push_back(v[2]);
         }
     }
-    return vertices;
+}
+
+
+void calculateNormalsCubesphere(int face, float angle, int axis, glm::tvec3<float> *normal) {
+    switch (face) {
+    case 0: //KA DESNO
+        if (axis == 1) {
+            (*normal)[0] = -sin(angle);
+            (*normal)[1] = 0;
+            (*normal)[2] = -cos(angle);
+        }
+        else if (axis == 2) {
+            (*normal)[0] = -sin(angle);
+            (*normal)[1] = cos(angle);
+            (*normal)[2] = 0;
+        }
+        break;
+    case 1: //KA LEVO
+        if (axis == 1) {
+            (*normal)[0] = sin(angle);
+            (*normal)[1] = 0;
+            (*normal)[2] = cos(angle);
+        }
+        else if (axis == 2) {
+            (*normal)[0] = sin(angle);
+            (*normal)[1] = cos(angle);
+            (*normal)[2] = 0;
+        }
+        break;
+    case 2: //KA GORE
+        if (axis == 1) {
+            (*normal)[0] = cos(angle);
+            (*normal)[1] = -sin(angle);
+            (*normal)[2] = 0;
+        }
+        else if (axis == 2) {
+            (*normal)[0] = 0;
+            (*normal)[1] = -sin(angle);
+            (*normal)[2] = -cos(angle);
+        }
+        break;
+    case 3: //KA DOLE
+        if (axis == 1) {
+            (*normal)[0] = -cos(angle);
+            (*normal)[1] = sin(angle);
+            (*normal)[2] = 0;
+        }
+        else if (axis == 2) {
+            (*normal)[0] = 0;
+            (*normal)[1] = sin(angle);
+            (*normal)[2] = -cos(angle);
+        }
+        break;
+    case 4: //NAPRED
+        if (axis == 1) {
+            (*normal)[0] = cos(angle);
+            (*normal)[1] = 0;
+            (*normal)[2] = -sin(angle);
+        }
+        else if (axis == 2) {
+            (*normal)[0] = 0;
+            (*normal)[1] = cos(angle);
+            (*normal)[2] = -sin(angle);
+        }
+        break;
+    case 5: //POZADI
+        if (axis == 1) {
+            (*normal)[0] = -cos(angle);
+            (*normal)[1] = 0;
+            (*normal)[2] = sin(angle);
+        }
+        else if (axis == 2) {
+            (*normal)[0] = 0;
+            (*normal)[1] = cos(angle);
+            (*normal)[2] = sin(angle);
+        }
+        break;
+    }
 }
