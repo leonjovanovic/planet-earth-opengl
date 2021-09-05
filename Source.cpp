@@ -1,5 +1,3 @@
-
-
 #include "glad/glad.h"
 #include "GLFW/glfw3.h"
 #include "Shader.h"
@@ -14,6 +12,8 @@
 #include <vector>
 
 
+GLFWwindow* openGlInit();
+void loadTexture(unsigned int texture, std::string path, bool alpha);
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void processInput(GLFWwindow* window);
 void mouse_callback(GLFWwindow* window, double xpos, double ypos);
@@ -23,10 +23,9 @@ void createCubeSphereFace(int face, int subdivision, std::vector<float>* vertice
 void calculateNormalsCubesphere(int face, float angle, int axis, glm::tvec3<float> *normal);
 void addTextureCoords();
 
-// settings
+
 const unsigned int SCR_WIDTH = 800;
 const unsigned int SCR_HEIGHT = 600;
-
 
 Camera camera(glm::vec3(0.0f, 0.0f, 3.0f));
 
@@ -34,97 +33,63 @@ float lastX = SCR_WIDTH / 2.0f;
 float lastY = SCR_HEIGHT / 2.0f;
 bool firstMouse = true;
 
-float deltaTime = 0.0f;	// time between current frame and last frame
+float deltaTime = 0.0f;
 float lastFrame = 0.0f;
 
-//*******************PARAMETERS*******************
+// ------------------ Parameters ---------------- 
 int subdivision = 6;
 int numFaces = 6;
-int rowPerFace = glm::pow(2, subdivision) + 1;
-
+glm::vec3 lightPos = glm::vec3(10.0f, 0.0f, 0.0f); 
+glm::vec3 lightColor = glm::vec3(1.0f, 1.0f, 1.0f);
+// ----------------------------------------------
+int rowPerFace = (int)glm::pow(2, subdivision) + 1;
 
 float cubesphereVertices[76050 + 50700];
 unsigned int cubesphereIndices[152100];
 
 int main()
 {
-    // glfw: initialize and configure
-    // ------------------------------
-    glfwInit();
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-
-#ifdef __APPLE__
-    glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
-#endif
-
-    // glfw window creation
-    // --------------------
-    GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "LearnOpenGL", NULL, NULL);
-    if (window == NULL)
-    {
-        std::cout << "Failed to create GLFW window" << std::endl;
-        glfwTerminate();
-        return -1;
-    }
-    glfwMakeContextCurrent(window);
-    glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
-    glfwSetCursorPosCallback(window, mouse_callback);
-    glfwSetScrollCallback(window, scroll_callback);
-
-    // tell GLFW to capture our mouse
-    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-
-
-    // glad: load all OpenGL function pointers
-    // ---------------------------------------
-    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
-    {
-        std::cout << "Failed to initialize GLAD" << std::endl;
-        return -1;
-    }
-
-    // ---------- Texture -----------------------
-    // ------------------------------------------
+    // ----------------------------------- Initialize, configure and create window --------------------------------------- 
+    GLFWwindow* window = openGlInit();
+    if (window == NULL) return -1;
+    // -------------------------------------------------------------------------------------------------------------------  
+    
+    // ---------------------------------------------- Textures loading-----------------------------------------------------
     unsigned int textureEarth;
     glGenTextures(1, &textureEarth);
+    glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, textureEarth);
-    // set the texture wrapping/filtering options (on the currently bound texture object)
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    // load and generate the texture
-    int width, height, nrChannels;
-    stbi_set_flip_vertically_on_load(true);
-    unsigned char* data = stbi_load("earth.jpg", &width, &height, &nrChannels, 0);
-    if (data)
-    {
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
-        glGenerateMipmap(GL_TEXTURE_2D);
-    }
-    else
-    {
-        std::cout << "Failed to load texture" << std::endl;
-    }
-    stbi_image_free(data);
-    // ------------------------------------------
+    loadTexture(textureEarth, std::string("earth.jpg"), false);    
+    // -------------------------------------------------------------------------------------------------------------------  
+    unsigned int textureEarthHeight;
+    glGenTextures(1, &textureEarthHeight);
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, textureEarthHeight);
+    loadTexture(textureEarthHeight, std::string("heightMap.png"), true);
+    // ------------------------------------------------------------------------------------------------------------------- 
 
-    // build and compile our shader program
+    // -------------------------------------- Build and compile our shader program ---------------------------------------
     Shader shader = Shader("shader.vs", "shader.fs", "shader.gs");
+    shader.use();
+    // Set uniform sample2D textures in fragment shader
+    shader.setInt("earth", 0);
+    shader.setInt("earth_height", 1);
+    shader.setInt("earth_height", 1);
+    shader.setVec3("lightPos", lightPos);
+    shader.setVec3("lightColor", lightColor);
+    shader.setVec3("viewPos", camera.Position);
+    // ------------------------------------------------------------------------------------------------------------------- 
 
-    // set up vertex data (and buffer(s)) and configure vertex attributes
-    // ------------------------------------------------------------------
+    // -------------------------------- Create CubeSphere by adding vertices and indices ---------------------------------
     createCubeSphere(subdivision);
-    // ------------------------------------------------------------------
-
-
+    // -------------------------------------------------------------------------------------------------------------------   
+    
+    // ----------------------- Set up vertex data (and buffer(s)) and configure vertex attributes ------------------------
     unsigned int VBO, VAO, EBO;
     glGenVertexArrays(1, &VAO);
     glGenBuffers(1, &VBO);
     glGenBuffers(1, &EBO);
-    // bind the Vertex Array Object first, then bind and set vertex buffer(s), and then configure vertex attributes(s).
+
     glBindVertexArray(VAO);
 
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
@@ -138,75 +103,129 @@ int main()
     glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)(rowPerFace * rowPerFace * numFaces * 3 * sizeof(float)));
     glEnableVertexAttribArray(1);
 
-    // note that this is allowed, the call to glVertexAttribPointer registered VBO as the vertex attribute's bound vertex buffer object so afterwards we can safely unbind
     glBindBuffer(GL_ARRAY_BUFFER, 0);
-
-    // You can unbind the VAO afterwards so other VAO calls won't accidentally modify this VAO, but this rarely happens. Modifying other
-    // VAOs requires a call to glBindVertexArray anyways so we generally don't unbind VAOs (nor VBOs) when it's not directly necessary.
     glBindVertexArray(0);
+    // -------------------------------------------------------------------------------------------------------------------   
 
-    // uncomment this call to draw in wireframe polygons.
+    // --------------------------------------- Wireframe polygons --------------------------------------------------------  
     //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+    // -------------------------------------------------------------------------------------------------------------------   
 
-    // enable Depth test
+    // -------------------------------------- Enable Depth testing -------------------------------------------------------    
     glEnable(GL_DEPTH_TEST);
+    // -------------------------------------------------------------------------------------------------------------------   
 
-    //World, view, perspective space    
+    // --------------------------------- World, View, Perspective space --------------------------------------------------    
     glm::mat4 model = glm::mat4(1.0f);
-    //model = glm::rotate(model, glm::radians(-55.0f), glm::vec3(1.0f, 0.0f, 0.0f));
     glm::mat4 view = glm::mat4(1.0f);
-    // note that we're translating the scene in the reverse direction of where we want to move
-    //view = glm::translate(view, glm::vec3(0.0f, 0.0f, -3.0f));
     glm::mat4 projection;
     projection = glm::perspective(glm::radians(45.0f), 800.0f / 600.0f, 0.1f, 100.0f);
-
-    shader.use();
-    shader.setInt("earth", 0);
-    // render loop
-    // -----------
+    // -------------------------------------------------------------------------------------------------------------------   
+    
+    // ------------------------------------------ Render loop ------------------------------------------------------------
     while (!glfwWindowShouldClose(window))
     {
-        // per-frame time logic
-        // --------------------
-        float currentFrame = glfwGetTime();
+        float currentFrame = (float)glfwGetTime();
         deltaTime = currentFrame - lastFrame;
         lastFrame = currentFrame;
 
         processInput(window);
+
         glClearColor(0.2f, 0.3f, 0.3f, 1.0f); 
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+        // ---------------------- World, View, Perspective space adjusted for camera -------------------------------------
         shader.use();
         shader.setMat4("model", model);
-        // camera/view transformation
         glm::mat4 view = camera.GetViewMatrix();
-        shader.setMat4("view", view);
-        // pass projection matrix to shader (note that in this case it could change every frame)
+        shader.setMat4("viewV", view);
+        shader.setMat4("viewG", view);
+        shader.setMat4("viewF", view);
         glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
         shader.setMat4("projection", projection);
+        // ---------------------------------------------------------------------------------------------------------------
 
+
+        // ------------------------------ Bind buffers and draw Cubesphere -----------------------------------------------
+        glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, textureEarth);
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, textureEarthHeight);
+
         glBindVertexArray(VAO); 
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
         glDrawElements(GL_TRIANGLES, sizeof(cubesphereIndices)/4, GL_UNSIGNED_INT, 0);
-        //glDrawArrays(GL_POINTS, 0, cubesphereVerticesVector.size() / 3);
-        // glBindVertexArray(0); // no need to unbind it every time 
+        // glDrawArrays(GL_POINTS, 0, cubesphereVerticesVector.size() / 3);
+        // glBindVertexArray(0); 
+        // ---------------------------------------------------------------------------------------------------------------
 
-        // glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
-        // -------------------------------------------------------------------------------
         glfwSwapBuffers(window);
         glfwPollEvents();
     }
+    // -------------------------------------------------------------------------------------------------------------------   
 
-    // optional: de-allocate all resources once they've outlived their purpose:
-    // ------------------------------------------------------------------------
+    // --------------------------------------- Deallocate buffers --------------------------------------------------------
     glDeleteVertexArrays(1, &VAO);
     glDeleteBuffers(1, &VBO);
+    // -------------------------------------------------------------------------------------------------------------------   
 
-    // glfw: terminate, clearing all previously allocated GLFW resources.
-    // ------------------------------------------------------------------
     glfwTerminate();
     return 0;
+}
+
+GLFWwindow* openGlInit() {
+    glfwInit();
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+
+    GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "LearnOpenGL", NULL, NULL);
+    if (window == NULL)
+    {
+        std::cout << "Failed to create GLFW window" << std::endl;
+        glfwTerminate();
+        return NULL;
+    }
+    glfwMakeContextCurrent(window);
+    glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
+    glfwSetCursorPosCallback(window, mouse_callback);
+    glfwSetScrollCallback(window, scroll_callback);
+
+    // Lock mouse
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+
+    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
+    {
+        std::cout << "Failed to initialize GLAD" << std::endl;
+        return NULL;
+    }
+    return window;
+}
+
+void loadTexture(unsigned int texture, std::string path, bool alpha) {
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    int width, height, nrChannels;
+    stbi_set_flip_vertically_on_load(true);
+    unsigned char* data = stbi_load(path.c_str(), &width, &height, &nrChannels, 0);
+    if (data)
+    {
+        if (alpha) {
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+        }
+        else {
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+        }
+        glGenerateMipmap(GL_TEXTURE_2D);
+    }
+    else
+    {
+        std::cout << "Failed to load texture" << std::endl;
+    }
+    stbi_image_free(data);
 }
 
 // process all input: query GLFW whether relevant keys are pressed/released this frame and react accordingly
@@ -225,13 +244,11 @@ void processInput(GLFWwindow* window)
         camera.ProcessKeyboard(RIGHT, deltaTime);
 }
 
-// glfw: whenever the window size changed (by OS or user resize) this callback function executes
-// ---------------------------------------------------------------------------------------------
 void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 {
-    // make sure the viewport matches the new window dimensions; note that width and 
-    // height will be significantly larger than specified on retina displays.
+    // ------------------ If we want to change window size callback this function and adjust Viewport -------------------
     glViewport(0, 0, width, height);
+    // ------------------------------------------------------------------------------------------------------------------- 
 }
 
 // glfw: whenever the mouse moves, this callback is called
@@ -240,16 +257,16 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos)
 {
     if (firstMouse)
     {
-        lastX = xpos;
-        lastY = ypos;
+        lastX = (float)xpos;
+        lastY = (float)ypos;
         firstMouse = false;
     }
 
-    float xoffset = xpos - lastX;
-    float yoffset = lastY - ypos; // reversed since y-coordinates go from bottom to top
+    float xoffset = (float)xpos - lastX;
+    float yoffset = lastY - (float)ypos; // reversed since y-coordinates go from bottom to top
 
-    lastX = xpos;
-    lastY = ypos;
+    lastX = (float)xpos;
+    lastY = (float)ypos;
 
     camera.ProcessMouseMovement(xoffset, yoffset);
 }
@@ -258,7 +275,7 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos)
 // ----------------------------------------------------------------------
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 {
-    camera.ProcessMouseScroll(yoffset);
+    camera.ProcessMouseScroll((float)yoffset);
 }
 
 void createCubeSphere(int subdivision) {
@@ -267,13 +284,13 @@ void createCubeSphere(int subdivision) {
     for (int i = 0; i < numFaces; i++) {
         createCubeSphereFace(i, subdivision, &cubesphereVerticesVector);
     }
-    for (unsigned int i = 0; i < cubesphereVerticesVector.size(); i++) {
+    for (int i = 0; i < cubesphereVerticesVector.size(); i++) {
         cubesphereVertices[i] = cubesphereVerticesVector[i];
     }
-    unsigned int j = 0;
-    for (unsigned int i = 0; i + rowPerFace + 1 <= cubesphereVerticesVector.size() / 3; i++) {
+    int j = 0;
+    for (int i = 0; ((float)i + rowPerFace + 1) <= cubesphereVerticesVector.size() / 3; i++) {
         if ((i + rowPerFace) % (rowPerFace * rowPerFace) == 0) {
-            i += rowPerFace - 1; //-1 because after continue i++ -------------------------------------------------------------------------------------------------------------------
+            i += rowPerFace - 1; //-1 because after continue i++ 
             continue;
         }
         if ((i + 1) % rowPerFace == 0) continue;
@@ -285,45 +302,37 @@ void createCubeSphere(int subdivision) {
         cubesphereIndices[j + 5] = i + rowPerFace + 1;
         j += 6;
     }
-    addTextureCoords();   
-   
+
+    addTextureCoords();      
 }
 
 void createCubeSphereFace(int face, int subdivision, std::vector<float>* vertices) {
 
-    //std::vector<float> vertices;
-    glm::tvec3<float> n1(0, 0, 0);        // normal of longitudinal plane rotating along Y-axis
-    glm::tvec3<float> n2(0, 0, 0);        // normal of latitudinal plane rotating along Z-axis
-    glm::tvec3<float> v;         // direction vector intersecting 2 planes, n1 x n2
-    float a1;           // longitudinal angle along Y-axis
-    float a2;           // latitudinal angle along Z-axis
+    glm::tvec3<float> n1(0, 0, 0);
+    glm::tvec3<float> n2(0, 0, 0);
+    glm::tvec3<float> v;
+    float a1;           
+    float a2;
 
-    // compute the number of vertices per row, 2^n + 1
     int pointsPerRow = (int)pow(2, subdivision) + 1;
 
     // rotate latitudinal plane from 45 to -45 degrees along Z-axis (top-to-bottom)
-    for (unsigned int i = 0; i < pointsPerRow; ++i)
+    for (int i = 0; i < pointsPerRow; ++i)
     {
-        // normal for latitudinal plane
-        // if latitude angle is 0, then normal vector of latitude plane is n2=(0,1,0)
-        // therefore, it is rotating (0,1,0) vector by latitude angle a2
         a2 = glm::radians((45.0f - 90.0f * i / (pointsPerRow - 1)));
-        //std::cout << a2 << std::endl;
+
         calculateNormalsCubesphere(face, a2, 2, &n2);
 
         // rotate longitudinal plane from -45 to 45 along Y-axis (left-to-right)
-        for (unsigned int j = 0; j < pointsPerRow; ++j)
+        for (int j = 0; j < pointsPerRow; ++j)
         {
-            // normal for longitudinal plane
-            // if longitude angle is 0, then normal vector of longitude is n1=(0,0,-1)
-            // therefore, it is rotating (0,0,-1) vector by longitude angle a1
             a1 = glm::radians((-45.0f + 90.0f * j / (pointsPerRow - 1)));
+
             calculateNormalsCubesphere(face, a1, 1, &n1);
 
             // find direction vector of intersected line, n1 x n2
-            // normalize direction vector
             v = normalize(glm::cross(n1, n2));
-            // add a vertex into array
+
             (*vertices).push_back(v[0]);
             (*vertices).push_back(v[1]);
             (*vertices).push_back(v[2]);
@@ -331,10 +340,9 @@ void createCubeSphereFace(int face, int subdivision, std::vector<float>* vertice
     }
 }
 
-
 void calculateNormalsCubesphere(int face, float angle, int axis, glm::tvec3<float> *normal) {
     switch (face) {
-    case 0: //KA DESNO
+    case 0: // Right
         if (axis == 1) {
             (*normal)[0] = -sin(angle);
             (*normal)[1] = 0;
@@ -346,7 +354,19 @@ void calculateNormalsCubesphere(int face, float angle, int axis, glm::tvec3<floa
             (*normal)[2] = 0;
         }
         break;
-    case 2: //KA LEVO
+    case 1: // Back
+        if (axis == 1) {
+            (*normal)[0] = -cos(angle);
+            (*normal)[1] = 0;
+            (*normal)[2] = sin(angle);
+        }
+        else if (axis == 2) {
+            (*normal)[0] = 0;
+            (*normal)[1] = cos(angle);
+            (*normal)[2] = sin(angle);
+        }
+        break;
+    case 2: // Left
         if (axis == 1) {
             (*normal)[0] = sin(angle);
             (*normal)[1] = 0;
@@ -358,31 +378,7 @@ void calculateNormalsCubesphere(int face, float angle, int axis, glm::tvec3<floa
             (*normal)[2] = 0;
         }
         break;
-    case 5: //KA GORE
-        if (axis == 1) {
-            (*normal)[0] = cos(angle);
-            (*normal)[1] = -sin(angle);
-            (*normal)[2] = 0;
-        }
-        else if (axis == 2) {
-            (*normal)[0] = 0;
-            (*normal)[1] = -sin(angle);
-            (*normal)[2] = -cos(angle);
-        }
-        break;
-    case 4: //KA DOLE
-        if (axis == 1) {
-            (*normal)[0] = -cos(angle);
-            (*normal)[1] = sin(angle);
-            (*normal)[2] = 0;
-        }
-        else if (axis == 2) {
-            (*normal)[0] = 0;
-            (*normal)[1] = sin(angle);
-            (*normal)[2] = -cos(angle);
-        }
-        break;
-    case 3: //NAPRED
+    case 3: // Forward
         if (axis == 1) {
             (*normal)[0] = cos(angle);
             (*normal)[1] = 0;
@@ -394,18 +390,30 @@ void calculateNormalsCubesphere(int face, float angle, int axis, glm::tvec3<floa
             (*normal)[2] = -sin(angle);
         }
         break;
-    case 1: //POZADI
+    case 4: // Down
         if (axis == 1) {
             (*normal)[0] = -cos(angle);
-            (*normal)[1] = 0;
-            (*normal)[2] = sin(angle);
+            (*normal)[1] = sin(angle);
+            (*normal)[2] = 0;
         }
         else if (axis == 2) {
             (*normal)[0] = 0;
-            (*normal)[1] = cos(angle);
-            (*normal)[2] = sin(angle);
+            (*normal)[1] = sin(angle);
+            (*normal)[2] = -cos(angle);
         }
         break;
+    case 5: //Up
+        if (axis == 1) {
+            (*normal)[0] = cos(angle);
+            (*normal)[1] = -sin(angle);
+            (*normal)[2] = 0;
+        }
+        else if (axis == 2) {
+            (*normal)[0] = 0;
+            (*normal)[1] = -sin(angle);
+            (*normal)[2] = -cos(angle);
+        }
+        break;    
     }
 }
 
@@ -424,9 +432,6 @@ void addTextureCoords() {
 
         if (u == 1) {
             u = 0;
-        }
-        if (u == 0) {
-            //std::cout << i/3 << " " << i+1 << " " << i+2 << std::endl;
         }
         cubesphereVertices[totalVerCoords++] = u;
         cubesphereVertices[totalVerCoords++] = v;
