@@ -26,19 +26,19 @@ void main()
 		gl_Position = elevate(gl_in[0].gl_Position.xyz, texture(earth_height, textCoords[0]).r);
 		TextCoords.x = 1;
 		TextCoords.y = textCoords[0].y;
-		FragPosition = vec3(viewG * vec4(fragPosition[0], 1.0));
+		FragPosition = fragPosition[0];
 		Normal = normal[0];
 		EmitVertex();
 		
 		gl_Position = elevate(gl_in[1].gl_Position.xyz, texture(earth_height, textCoords[1]).r);
 		TextCoords = textCoords[1];
-		FragPosition = vec3(viewG * vec4(fragPosition[1], 1.0));
+		FragPosition = fragPosition[1];
 		Normal = normal[1];
 		EmitVertex();
 		
 		gl_Position = elevate(gl_in[2].gl_Position.xyz, texture(earth_height, textCoords[2]).r);
 		TextCoords = textCoords[2];
-		FragPosition = vec3(viewG * vec4(fragPosition[2], 1.0));
+		FragPosition = fragPosition[2];
 		Normal = normal[2];
 		EmitVertex();		
 		
@@ -47,20 +47,20 @@ void main()
 	else if(textCoords[1].x == 0 && textCoords[0].x > 0.9f && textCoords[2].x > 0.9f){
 		gl_Position = elevate(gl_in[0].gl_Position.xyz, texture(earth_height, textCoords[0]).r);
 		TextCoords = textCoords[0];
-		FragPosition = vec3(viewG * vec4(fragPosition[0], 1.0));
+		FragPosition = fragPosition[0];
 		Normal = normal[0];
 		EmitVertex();
 		
 		gl_Position = elevate(gl_in[1].gl_Position.xyz, texture(earth_height, textCoords[1]).r);
 		TextCoords.x = 1;
 		TextCoords.y = textCoords[1].y;
-		FragPosition = vec3(viewG * vec4(fragPosition[1], 1.0));
+		FragPosition = fragPosition[1];
 		Normal = normal[1];
 		EmitVertex();
 		
 		gl_Position = elevate(gl_in[2].gl_Position.xyz, texture(earth_height, textCoords[2]).r);
 		TextCoords = textCoords[2];
-		FragPosition = vec3(viewG * vec4(fragPosition[2], 1.0));
+		FragPosition = fragPosition[2];
 		Normal = normal[2];
 		EmitVertex();	
 		
@@ -69,20 +69,20 @@ void main()
 	else if(textCoords[2].x == 0 && textCoords[0].x > 0.9f && textCoords[1].x > 0.9f){
 		gl_Position = elevate(gl_in[0].gl_Position.xyz, texture(earth_height, textCoords[0]).r);
 		TextCoords = textCoords[0];
-		FragPosition = vec3(viewG * vec4(fragPosition[0], 1.0));
+		FragPosition = fragPosition[0];
 		Normal = normal[0];
 		EmitVertex();
 		
 		gl_Position = elevate(gl_in[1].gl_Position.xyz, texture(earth_height, textCoords[1]).r);
 		TextCoords = textCoords[1];
-		FragPosition = vec3(viewG * vec4(fragPosition[1], 1.0));
+		FragPosition = fragPosition[1];
 		Normal = normal[1];
 		EmitVertex();
 		
 		gl_Position = elevate(gl_in[2].gl_Position.xyz, texture(earth_height, textCoords[2]).r);
 		TextCoords.x = 1;
 		TextCoords.y = textCoords[2].y;
-		FragPosition = vec3(viewG * vec4(fragPosition[2], 1.0));
+		FragPosition = fragPosition[2];
 		Normal = normal[2];
 		EmitVertex();
 		
@@ -92,20 +92,20 @@ void main()
 		gl_Position = elevate(gl_in[0].gl_Position.xyz, texture(earth_height, textCoords[0]).r);
 		TextCoords.x = 1;
 		TextCoords.y = textCoords[0].y;
-		FragPosition = vec3(viewG * vec4(fragPosition[0], 1.0));
+		FragPosition = fragPosition[0];
 		Normal = normal[0];
 		EmitVertex();
 		
 		gl_Position = elevate(gl_in[1].gl_Position.xyz, texture(earth_height, textCoords[1]).r);
 		TextCoords.x = 1;
 		TextCoords.y = textCoords[1].y;
-		FragPosition = vec3(viewG * vec4(fragPosition[1], 1.0));
+		FragPosition = fragPosition[1];
 		Normal = normal[1];
 		EmitVertex();
 		
 		gl_Position = gl_in[2].gl_Position;
-		gl_Position = elevate(gl_in[2].gl_Position.xyz, texture(earth_height, textCoords[2]).r);
-		FragPosition = vec3(viewG * vec4(fragPosition[2], 1.0));
+		gl_Position = elevate(gl_in[2].gl_Position.xyz, texture(earth_height, textCoords[2]).r);		
+		FragPosition = fragPosition[2];
 		Normal = normal[2];
 		EmitVertex();
 		
@@ -115,20 +115,20 @@ void main()
 		gl_Position = elevate(gl_in[0].gl_Position.xyz, texture(earth_height, textCoords[0]).r);
 		TextCoords.x = 1;
 		TextCoords.y = textCoords[0].y;
-		FragPosition = vec3(viewG * vec4(fragPosition[0], 1.0));
+		FragPosition = fragPosition[0];
 		Normal = normal[0];
 		EmitVertex();
 		
 		gl_Position = elevate(gl_in[1].gl_Position.xyz, texture(earth_height, textCoords[1]).r);
 		TextCoords = textCoords[1];
-		FragPosition = vec3(viewG * vec4(fragPosition[1], 1.0));
+		FragPosition = fragPosition[1];
 		Normal = normal[1];
 		EmitVertex();
 		
 		gl_Position = elevate(gl_in[2].gl_Position.xyz, texture(earth_height, textCoords[2]).r);
 		TextCoords.x = 1;
 		TextCoords.y = textCoords[2].y;
-		FragPosition = vec3(viewG * vec4(fragPosition[2], 1.0));
+		FragPosition = fragPosition[2];
 		Normal = normal[2];
 		EmitVertex();
 		
@@ -137,21 +137,21 @@ void main()
 	else if(textCoords[1].x == 0 && textCoords[2].x == 0 && textCoords[0].x > 0.9f){
 		gl_Position = elevate(gl_in[0].gl_Position.xyz, texture(earth_height, textCoords[0]).r);
 		TextCoords = textCoords[0];
-		FragPosition = vec3(viewG * vec4(fragPosition[0], 1.0));
+		FragPosition = fragPosition[0];
 		Normal = normal[0];
 		EmitVertex();
 		
 		gl_Position = elevate(gl_in[1].gl_Position.xyz, texture(earth_height, textCoords[1]).r);
 		TextCoords.x = 1;
 		TextCoords.y = textCoords[1].y;
-		FragPosition = vec3(viewG * vec4(fragPosition[1], 1.0));
+		FragPosition = fragPosition[1];
 		Normal = normal[1];
 		EmitVertex();
 		
 		gl_Position = elevate(gl_in[2].gl_Position.xyz, texture(earth_height, textCoords[2]).r);
 		TextCoords.x = 1;
 		TextCoords.y = textCoords[2].y;
-		FragPosition = vec3(viewG * vec4(fragPosition[2], 1.0));
+		FragPosition = fragPosition[2];
 		Normal = normal[2];
 		EmitVertex();
 		
@@ -163,7 +163,7 @@ void main()
 		{			
 			gl_Position = elevate(gl_in[i].gl_Position.xyz, texture(earth_height, textCoords[i]).r);
 			TextCoords = textCoords[i];
-			FragPosition = vec3(viewG * vec4(fragPosition[i], 1.0));
+			FragPosition = fragPosition[i];
 			Normal = normal[i];
 
 			EmitVertex();

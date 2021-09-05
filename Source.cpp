@@ -17,6 +17,7 @@ void loadTexture(unsigned int texture, std::string path, bool alpha);
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void processInput(GLFWwindow* window);
 void mouse_callback(GLFWwindow* window, double xpos, double ypos);
+void mouse_button_callback(GLFWwindow* window, int button, int action, int mods);
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 void createCubeSphere(int subdivision);
 void createCubeSphereFace(int face, int subdivision, std::vector<float>* vertices);
@@ -27,20 +28,31 @@ void addTextureCoords();
 const unsigned int SCR_WIDTH = 800;
 const unsigned int SCR_HEIGHT = 600;
 
-Camera camera(glm::vec3(0.0f, 0.0f, 3.0f));
+// -------------------- Camera ------------------
+float radius = 3.0f;
+float mouseSensitivity = 0.1f;
+float yaw = 90.0f;
+float pitch = 0.0f;
+float zoom = 45.0f;
+
+glm::vec3 cameraPos = glm::vec3(0.0f, 0.0f, 3.0f);
+glm::vec3 cameraTarget = glm::vec3(0.0f, 0.0f, 0.0f);
+glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f);
 
 float lastX = SCR_WIDTH / 2.0f;
 float lastY = SCR_HEIGHT / 2.0f;
+
+bool leftClicked = false;
 bool firstMouse = true;
 
 float deltaTime = 0.0f;
 float lastFrame = 0.0f;
+// ----------------------------------------------
 
 // ------------------ Parameters ---------------- 
 int subdivision = 6;
 int numFaces = 6;
-glm::vec3 lightPos = glm::vec3(10.0f, 0.0f, 0.0f); 
-glm::vec3 lightColor = glm::vec3(1.0f, 1.0f, 1.0f);
+glm::vec3 lightPos = glm::vec3(1.2f, 1.0f, 2.0f); 
 // ----------------------------------------------
 int rowPerFace = (int)glm::pow(2, subdivision) + 1;
 
@@ -66,6 +78,12 @@ int main()
     glActiveTexture(GL_TEXTURE1);
     glBindTexture(GL_TEXTURE_2D, textureEarthHeight);
     loadTexture(textureEarthHeight, std::string("heightMap.png"), true);
+    // -------------------------------------------------------------------------------------------------------------------  
+    unsigned int textureSpecularMap;
+    glGenTextures(1, &textureSpecularMap);
+    glActiveTexture(GL_TEXTURE2);
+    glBindTexture(GL_TEXTURE_2D, textureSpecularMap);
+    loadTexture(textureSpecularMap, std::string("specularMap.png"), true);
     // ------------------------------------------------------------------------------------------------------------------- 
 
     // -------------------------------------- Build and compile our shader program ---------------------------------------
@@ -74,10 +92,12 @@ int main()
     // Set uniform sample2D textures in fragment shader
     shader.setInt("earth", 0);
     shader.setInt("earth_height", 1);
-    shader.setInt("earth_height", 1);
+    shader.setInt("specularMap", 2);
     shader.setVec3("lightPos", lightPos);
-    shader.setVec3("lightColor", lightColor);
-    shader.setVec3("viewPos", camera.Position);
+
+    shader.setFloat("constant", 1.0f);
+    shader.setFloat("linear", 0.09f);
+    shader.setFloat("quadratic", 0.032f);
     // ------------------------------------------------------------------------------------------------------------------- 
 
     // -------------------------------- Create CubeSphere by adding vertices and indices ---------------------------------
@@ -119,7 +139,6 @@ int main()
     glm::mat4 model = glm::mat4(1.0f);
     glm::mat4 view = glm::mat4(1.0f);
     glm::mat4 projection;
-    projection = glm::perspective(glm::radians(45.0f), 800.0f / 600.0f, 0.1f, 100.0f);
     // -------------------------------------------------------------------------------------------------------------------   
     
     // ------------------------------------------ Render loop ------------------------------------------------------------
@@ -137,12 +156,15 @@ int main()
         // ---------------------- World, View, Perspective space adjusted for camera -------------------------------------
         shader.use();
         shader.setMat4("model", model);
-        glm::mat4 view = camera.GetViewMatrix();
+        
+        view = glm::lookAt(cameraPos, cameraTarget, up);
         shader.setMat4("viewV", view);
         shader.setMat4("viewG", view);
         shader.setMat4("viewF", view);
-        glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
+
+        glm::mat4 projection = glm::perspective(glm::radians(zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
         shader.setMat4("projection", projection);
+        shader.setVec3("viewPos", cameraPos);
         // ---------------------------------------------------------------------------------------------------------------
 
 
@@ -189,6 +211,7 @@ GLFWwindow* openGlInit() {
     glfwMakeContextCurrent(window);
     glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
     glfwSetCursorPosCallback(window, mouse_callback);
+    glfwSetMouseButtonCallback(window, mouse_button_callback);
     glfwSetScrollCallback(window, scroll_callback);
 
     // Lock mouse
@@ -228,54 +251,74 @@ void loadTexture(unsigned int texture, std::string path, bool alpha) {
     stbi_image_free(data);
 }
 
-// process all input: query GLFW whether relevant keys are pressed/released this frame and react accordingly
-// ---------------------------------------------------------------------------------------------------------
 void processInput(GLFWwindow* window)
 {
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
         glfwSetWindowShouldClose(window, true);
-    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
-        camera.ProcessKeyboard(FORWARD, deltaTime);
-    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
-        camera.ProcessKeyboard(BACKWARD, deltaTime);
-    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
-        camera.ProcessKeyboard(LEFT, deltaTime);
-    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
-        camera.ProcessKeyboard(RIGHT, deltaTime);
 }
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 {
     // ------------------ If we want to change window size callback this function and adjust Viewport -------------------
     glViewport(0, 0, width, height);
+    // ------------------------------------------------------------------------------------------------------------------
+}
+
+void mouse_callback(GLFWwindow* window, double xpos, double ypos)
+{
+    // ------------------------------ Whenever the mouse moves, this callback is called ---------------------------------    
+    if (leftClicked) {
+        if (firstMouse)
+            {
+                lastX = (float)xpos;
+                lastY = (float)ypos;
+                firstMouse = false;
+            }
+        float xoffset = (float)xpos - lastX;
+        float yoffset = lastY - (float)ypos; // reversed since y-coordinates go from bottom to top
+
+        lastX = (float)xpos;
+        lastY = (float)ypos;
+
+        xoffset *= mouseSensitivity;
+        yoffset *= mouseSensitivity;
+
+        yaw += xoffset;
+        pitch += yoffset;
+
+        if (pitch > 89.0f)
+            pitch = 89.0f;
+        if (pitch < -89.0f)
+            pitch = -89.0f;
+
+        glm::vec3 front;
+        front.x = cos(glm::radians(yaw)) * cos(glm::radians(pitch));
+        front.y = -sin(glm::radians(pitch));
+        front.z = sin(glm::radians(yaw)) * cos(glm::radians(pitch));
+        cameraPos = front * radius;
+        //camera.ProcessMouseMovement(xoffset, yoffset);
+    }
     // ------------------------------------------------------------------------------------------------------------------- 
 }
 
-// glfw: whenever the mouse moves, this callback is called
-// -------------------------------------------------------
-void mouse_callback(GLFWwindow* window, double xpos, double ypos)
-{
-    if (firstMouse)
-    {
-        lastX = (float)xpos;
-        lastY = (float)ypos;
-        firstMouse = false;
+void mouse_button_callback(GLFWwindow* window, int button, int action, int mods) {
+    if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS)
+        leftClicked = true;
+    if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_RELEASE) {
+        firstMouse = true;
+        leftClicked = false;
     }
-
-    float xoffset = (float)xpos - lastX;
-    float yoffset = lastY - (float)ypos; // reversed since y-coordinates go from bottom to top
-
-    lastX = (float)xpos;
-    lastY = (float)ypos;
-
-    camera.ProcessMouseMovement(xoffset, yoffset);
 }
 
-// glfw: whenever the mouse scroll wheel scrolls, this callback is called
-// ----------------------------------------------------------------------
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 {
-    camera.ProcessMouseScroll((float)yoffset);
+    // ------------------------------ Whenever the scroll moves, this callback is called ---------------------------------    
+    zoom -= (float)yoffset;
+    if (zoom < 1.0f)
+        zoom = 1.0f;
+    if (zoom > 45.0f)
+        zoom = 45.0f;
+    // ------------------------------------------------------------------------------------------------------------------- 
 }
 
 void createCubeSphere(int subdivision) {
