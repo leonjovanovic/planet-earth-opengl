@@ -8,12 +8,12 @@ out vec3 fragPosition;
 out vec3 normal;
 
 uniform mat4 model;
-uniform mat4 viewV;
+uniform mat4 view;
 
 void main()
 {
 	gl_Position = model * vec4(position, 1.0);
-	fragPosition = vec3(viewV * model * vec4(position, 1.0));
-	normal = mat3(transpose(inverse(viewV * model))) * position;
+	fragPosition = vec3(view * model * vec4(position, 1.0));
+	normal = mat3(transpose(inverse(view * model))) * position;
 	textCoords = textureCoords;
 }

@@ -1,7 +1,6 @@
 #include "glad/glad.h"
 #include "GLFW/glfw3.h"
 #include "Shader.h"
-#include "camera.h"
 #include "stb_image.h"
 
 #include "glm/glm.hpp"
@@ -23,6 +22,7 @@ void createCubeSphere(int subdivision);
 void createCubeSphereFace(int face, int subdivision, std::vector<float>* vertices);
 void calculateNormalsCubesphere(int face, float angle, int axis, glm::tvec3<float> *normal);
 void addTextureCoords();
+unsigned int loadCubemap(std::string faces);
 
 
 const unsigned int SCR_WIDTH = 800;
@@ -52,12 +52,56 @@ float lastFrame = 0.0f;
 // ------------------ Parameters ---------------- 
 int subdivision = 6;
 int numFaces = 6;
-glm::vec3 lightPos = glm::vec3(1.2f, 1.0f, 2.0f); 
+glm::vec3 lightPos = glm::vec3(1.2f, 0.1f, 2.0f); 
 // ----------------------------------------------
 int rowPerFace = (int)glm::pow(2, subdivision) + 1;
 
 float cubesphereVertices[76050 + 50700];
 unsigned int cubesphereIndices[152100];
+
+float skyboxVertices[] = { 
+    -1.0f,  1.0f, -1.0f,
+    -1.0f, -1.0f, -1.0f,
+     1.0f, -1.0f, -1.0f,
+     1.0f, -1.0f, -1.0f,
+     1.0f,  1.0f, -1.0f,
+    -1.0f,  1.0f, -1.0f,
+
+    -1.0f, -1.0f,  1.0f,
+    -1.0f, -1.0f, -1.0f,
+    -1.0f,  1.0f, -1.0f,
+    -1.0f,  1.0f, -1.0f,
+    -1.0f,  1.0f,  1.0f,
+    -1.0f, -1.0f,  1.0f,
+
+     1.0f, -1.0f, -1.0f,
+     1.0f, -1.0f,  1.0f,
+     1.0f,  1.0f,  1.0f,
+     1.0f,  1.0f,  1.0f,
+     1.0f,  1.0f, -1.0f,
+     1.0f, -1.0f, -1.0f,
+
+    -1.0f, -1.0f,  1.0f,
+    -1.0f,  1.0f,  1.0f,
+     1.0f,  1.0f,  1.0f,
+     1.0f,  1.0f,  1.0f,
+     1.0f, -1.0f,  1.0f,
+    -1.0f, -1.0f,  1.0f,
+
+    -1.0f,  1.0f, -1.0f,
+     1.0f,  1.0f, -1.0f,
+     1.0f,  1.0f,  1.0f,
+     1.0f,  1.0f,  1.0f,
+    -1.0f,  1.0f,  1.0f,
+    -1.0f,  1.0f, -1.0f,
+
+    -1.0f, -1.0f, -1.0f,
+    -1.0f, -1.0f,  1.0f,
+     1.0f, -1.0f, -1.0f,
+     1.0f, -1.0f, -1.0f,
+    -1.0f, -1.0f,  1.0f,
+     1.0f, -1.0f,  1.0f
+};
 
 int main()
 {
@@ -85,6 +129,8 @@ int main()
     glBindTexture(GL_TEXTURE_2D, textureSpecularMap);
     loadTexture(textureSpecularMap, std::string("specularMap.png"), true);
     // ------------------------------------------------------------------------------------------------------------------- 
+    unsigned int cubemapTexture = loadCubemap("stars.jpg");
+    // ------------------------------------------------------------------------------------------------------------------- 
 
     // -------------------------------------- Build and compile our shader program ---------------------------------------
     Shader shader = Shader("shader.vs", "shader.fs", "shader.gs");
@@ -96,8 +142,12 @@ int main()
     shader.setVec3("lightPos", lightPos);
 
     shader.setFloat("constant", 1.0f);
-    shader.setFloat("linear", 0.09f);
-    shader.setFloat("quadratic", 0.032f);
+    shader.setFloat("linear", 0.045f);
+    shader.setFloat("quadratic", 0.0075f);
+    // ------------------------------------------------------------------------------------------------------------------- 
+    Shader shaderSkybox = Shader("shaderSkybox.vs", "shaderSkybox.fs", nullptr);
+    shaderSkybox.use();
+    shaderSkybox.setInt("skybox", 0);
     // ------------------------------------------------------------------------------------------------------------------- 
 
     // -------------------------------- Create CubeSphere by adding vertices and indices ---------------------------------
@@ -126,6 +176,21 @@ int main()
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
     // -------------------------------------------------------------------------------------------------------------------   
+    unsigned int VBO_SKY, VAO_SKY;
+    glGenVertexArrays(1, &VAO_SKY);
+    glGenBuffers(1, &VBO_SKY);
+
+    glBindVertexArray(VAO_SKY);
+
+    glBindBuffer(GL_ARRAY_BUFFER, VBO_SKY);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(skyboxVertices), skyboxVertices, GL_STATIC_DRAW);
+
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindVertexArray(0);
+    // ------------------------------------------------------------------------------------------------------------------- 
 
     // --------------------------------------- Wireframe polygons --------------------------------------------------------  
     //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
@@ -137,6 +202,7 @@ int main()
 
     // --------------------------------- World, View, Perspective space --------------------------------------------------    
     glm::mat4 model = glm::mat4(1.0f);
+    model = glm::rotate(model, glm::radians(-180.0f), glm::vec3(0.0f, 1.0f, 0.0f));
     glm::mat4 view = glm::mat4(1.0f);
     glm::mat4 projection;
     // -------------------------------------------------------------------------------------------------------------------   
@@ -149,36 +215,47 @@ int main()
         lastFrame = currentFrame;
 
         processInput(window);
-
+        view = glm::mat4(glm::mat3(glm::lookAt(cameraPos, cameraTarget, up)));
+        projection = glm::perspective(glm::radians(zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
         glClearColor(0.2f, 0.3f, 0.3f, 1.0f); 
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        glDepthMask(GL_FALSE);
+        shaderSkybox.use();
+        shaderSkybox.setMat4("model", model);
+        shaderSkybox.setMat4("view", view);
+        shaderSkybox.setMat4("projection", projection);
+        // ... set view and projection matrix
+        glBindVertexArray(VAO_SKY);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_CUBE_MAP, cubemapTexture);
+        glDrawArrays(GL_TRIANGLES, 0, 36);
+        glDepthMask(GL_TRUE);
+        // ... draw rest of the scene
 
         // ---------------------- World, View, Perspective space adjusted for camera -------------------------------------
         shader.use();
         shader.setMat4("model", model);
         
         view = glm::lookAt(cameraPos, cameraTarget, up);
-        shader.setMat4("viewV", view);
-        shader.setMat4("viewG", view);
-        shader.setMat4("viewF", view);
+        shader.setMat4("view", view);
 
-        glm::mat4 projection = glm::perspective(glm::radians(zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
+        projection = glm::perspective(glm::radians(zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
         shader.setMat4("projection", projection);
         shader.setVec3("viewPos", cameraPos);
         // ---------------------------------------------------------------------------------------------------------------
-
 
         // ------------------------------ Bind buffers and draw Cubesphere -----------------------------------------------
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, textureEarth);
         glActiveTexture(GL_TEXTURE1);
         glBindTexture(GL_TEXTURE_2D, textureEarthHeight);
+        glActiveTexture(GL_TEXTURE2);
+        glBindTexture(GL_TEXTURE_2D, textureSpecularMap);
 
         glBindVertexArray(VAO); 
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
         glDrawElements(GL_TRIANGLES, sizeof(cubesphereIndices)/4, GL_UNSIGNED_INT, 0);
-        // glDrawArrays(GL_POINTS, 0, cubesphereVerticesVector.size() / 3);
-        // glBindVertexArray(0); 
         // ---------------------------------------------------------------------------------------------------------------
 
         glfwSwapBuffers(window);
@@ -214,8 +291,6 @@ GLFWwindow* openGlInit() {
     glfwSetMouseButtonCallback(window, mouse_button_callback);
     glfwSetScrollCallback(window, scroll_callback);
 
-    // Lock mouse
-    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
     if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
     {
@@ -480,4 +555,37 @@ void addTextureCoords() {
         cubesphereVertices[totalVerCoords++] = v;
         i += 3;
     }
+}
+
+unsigned int loadCubemap(std::string faces)
+{
+    unsigned int textureID;
+    glGenTextures(1, &textureID);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, textureID);
+
+    int width, height, nrChannels;
+    for (unsigned int i = 0; i < 6; i++)
+    {
+        unsigned char* data = stbi_load(faces.c_str(), &width, &height, &nrChannels, 0);
+        if (data)
+        {
+            glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i,
+                0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data
+            );
+            stbi_image_free(data);
+        }
+        else
+        {
+            std::cout << "Cubemap tex failed to load at path: " << faces[i] << std::endl;
+            stbi_image_free(data);
+        }
+    }
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+
+    return textureID;
 }

@@ -13,11 +13,11 @@ out vec3 Normal;
 
 uniform sampler2D earth_height;
 uniform mat4 projection;
-uniform mat4 viewG;
+uniform mat4 view;
 
 vec4 elevate(vec3 position, float color) { 
 	float magnitude = 0.035;
-    return projection * viewG * vec4(position * (1.0 + color * magnitude), 1.0);	
+    return projection * view * vec4(position * (1.0 + color * magnitude), 1.0);	
 }
 
 void main()

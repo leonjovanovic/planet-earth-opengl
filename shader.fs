@@ -10,7 +10,7 @@ uniform sampler2D earth;
 uniform sampler2D specularMap;
 uniform vec3 lightPos; 
 uniform vec3 viewPos;
-uniform mat4 viewF;
+uniform mat4 view;
 
 //For point light
 uniform float constant;
@@ -20,11 +20,11 @@ uniform float quadratic;
 void main()
 {
 	//ambient
-	float ambientStrength = 0.1;
+	float ambientStrength = 0.3;
 	vec3 ambient = ambientStrength * vec3(texture(earth, TextCoords));
 	
 	//diffuse	
-    vec3 LightPos = vec3(viewF * vec4(lightPos, 1.0)); 	
+    vec3 LightPos = vec3(view * vec4(lightPos, 1.0)); 	
 	vec3 norm = normalize(Normal);
     vec3 lightDir = normalize(LightPos - FragPosition);
     float diff = max(dot(norm, lightDir), 0.0);
@@ -32,10 +32,10 @@ void main()
 	
     // specular
     float specularStrength = 0.3;
-    vec3 ViewPos = vec3(viewF * vec4(viewPos, 1.0)); 	
+    vec3 ViewPos = vec3(view * vec4(viewPos, 1.0)); 	
     vec3 viewDir = normalize(ViewPos - FragPosition);
     vec3 reflectDir = reflect(-lightDir, norm);  
-    float spec = pow(max(dot(viewDir, reflectDir), 0.0), 16);
+    float spec = pow(max(dot(viewDir, reflectDir), 0.0), 32);
     vec3 specular = specularStrength * spec * vec3(texture(specularMap, TextCoords));  
 	
 	//Point light constants
