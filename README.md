@@ -9,4 +9,7 @@
 
 ![Earth](images/earth.png)
 
-![Earth Youtube](images/earth_youtube.png)
+
+Video:
+
+[![Earth Youtube](images/earth_youtube.png)](https://youtu.be/mnQqhaXgkug)
