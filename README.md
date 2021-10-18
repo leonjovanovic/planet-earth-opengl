@@ -12,4 +12,4 @@
 
 Video:
 
-[![Earth Youtube](images/earth_youtube.png)](https://youtu.be/mnQqhaXgkug)
+[![Earth Youtube](images/earth_youtube.png)](https://youtu.be/Ylg2plAHDtw)
